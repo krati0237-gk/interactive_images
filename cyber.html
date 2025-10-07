@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Interactive Image Gallery</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: Arial, sans-serif;
+      background: #111;
+      color: #fff;
+      transition: background 0.3s, color 0.3s;
+    }
+    body.light {
+      background: #f9f9f9;
+      color: #000;
+    }
+
+    h1 {
+      text-align: center;
+      padding: 20px;
+    }
+
+    .controls {
+      text-align: center;
+      margin: 10px;
+    }
+    .controls button {
+      margin: 5px;
+      padding: 8px 12px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      background: #444;
+      color: #fff;
+      transition: background 0.3s;
+    }
+    body.light .controls button { background: #ddd; color: #000; }
+    .controls button:hover { background: #1db954; color: #fff; }
+
+    .gallery {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      padding: 20px;
+    }
+
+    .gallery-item {
+      position: relative;
+      overflow: hidden;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: transform 0.3s;
+    }
+    .gallery-item img {
+      width: 100%;
+      height: 200px;
+      object-fit: cover;
+      transition: filter 0.3s, transform 0.3s;
+    }
+    .gallery-item:hover img { transform: scale(1.05); }
+
+    .caption {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(0,0,0,0.6);
+      color: #fff;
+      padding: 5px;
+      font-size: 14px;
+      text-align: center;
+    }
+
+    .like-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(0,0,0,0.5);
+      border: none;
+      color: white;
+      font-size: 18px;
+      border-radius: 50%;
+      width: 35px;
+      height: 35px;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    .like-btn.liked { color: red; transform: scale(1.2); }
+
+    /* Lightbox */
+    .lightbox {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.9);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 999;
+      flex-direction: column;
+    }
+    .lightbox img {
+      max-width: 90%;
+      max-height: 70%;
+      transition: transform 0.3s;
+    }
+    .lightbox .caption {
+      margin-top: 10px;
+      font-size: 16px;
+    }
+    .nav-btn, .close-btn {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 30px;
+      color: white;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 10px;
+    }
+    .close-btn { top: 20px; right: 20px; font-size: 25px; }
+    .prev { left: 20px; }
+    .next { right: 20px; }
+
+    /* Filters */
+    .filter-grayscale img { filter: grayscale(100%); }
+    .filter-sepia img { filter: sepia(100%); }
+    .filter-blur img { filter: blur(2px); }
+    .filter-brightness img { filter: brightness(1.3); }
+  </style>
+</head>
+<body>
+  <h1>✨ Interactive Image Gallery</h1>
+
+  <div class="controls">
+    <button onclick="setFilter('none')">Normal</button>
+    <button onclick="setFilter('filter-grayscale')">Grayscale</button>
+    <button onclick="setFilter('filter-sepia')">Sepia</button>
+    <button onclick="setFilter('filter-blur')">Blur</button>
+    <button onclick="setFilter('filter-brightness')">Bright</button>
+    <button onclick="toggleTheme()">🌙/☀</button>
+  </div>
+
+  <div class="gallery" id="gallery">
+    <div class="gallery-item">
+      <img src="https://picsum.photos/id/1015/600/400" alt="Mountain">
+      <button class="like-btn">❤</button>
+      <div class="caption">Mountain View</div>
+    </div>
+    <div class="gallery-item">
+      <img src="https://picsum.photos/id/1025/600/400" alt="Dog">
+      <button class="like-btn">❤</button>
+      <div class="caption">Cute Dog</div>
+    </div>
+    <div class="gallery-item">
+      <img src="https://picsum.photos/id/1035/600/400" alt="Beach">
+      <button class="like-btn">❤</button>
+      <div class="caption">Sunny Beach</div>
+    </div>
+    <div class="gallery-item">
+      <img src="https://picsum.photos/id/1045/600/400" alt="Forest">
+      <button class="like-btn">❤</button>
+      <div class="caption">Green Forest</div>
+    </div>
+  </div>
+
+  <!-- Lightbox -->
+  <div class="lightbox" id="lightbox">
+    <button class="close-btn" id="closeBtn">✖</button>
+    <button class="nav-btn prev" id="prevBtn">⟨</button>
+    <img id="lightboxImg" src="">
+    <button class="nav-btn next" id="nextBtn">⟩</button>
+    <div class="caption" id="lightboxCaption"></div>
+  </div>
+
+  <script>
+    const galleryItems = document.querySelectorAll(".gallery-item");
+    const lightbox = document.getElementById("lightbox");
+    const lightboxImg = document.getElementById("lightboxImg");
+    const lightboxCaption = document.getElementById("lightboxCaption");
+    const closeBtn = document.getElementById("closeBtn");
+    const prevBtn = document.getElementById("prevBtn");
+    const nextBtn = document.getElementById("nextBtn");
+
+    let currentIndex = 0;
+
+    // Open lightbox
+    galleryItems.forEach((item, index) => {
+      item.addEventListener("click", () => {
+        if (!event.target.classList.contains("like-btn")) {
+          currentIndex = index;
+          showLightbox();
+        }
+      });
+    });
+
+    function showLightbox() {
+      const img = galleryItems[currentIndex].querySelector("img");
+      const caption = galleryItems[currentIndex].querySelector(".caption").innerText;
+      lightboxImg.src = img.src;
+      lightboxCaption.textContent = caption;
+      lightbox.style.display = "flex";
+    }
+
+    function closeLightbox() { lightbox.style.display = "none"; }
+    function prevImage() {
+      currentIndex = (currentIndex - 1 + galleryItems.length) % galleryItems.length;
+      showLightbox();
+    }
+    function nextImage() {
+      currentIndex = (currentIndex + 1) % galleryItems.length;
+      showLightbox();
+    }
+
+    closeBtn.addEventListener("click", closeLightbox);
+    prevBtn.addEventListener("click", prevImage);
+    nextBtn.addEventListener("click", nextImage);
+
+    // Keyboard navigation
+    document.addEventListener("keydown", (e) => {
+      if (lightbox.style.display === "flex") {
+        if (e.key === "ArrowRight") nextImage();
+        if (e.key === "ArrowLeft") prevImage();
+        if (e.key === "Escape") closeLightbox();
+      }
+    });
+
+    // Like Button
+    document.querySelectorAll(".like-btn").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        btn.classList.toggle("liked");
+      });
+    });
+
+    // Filters
+    function setFilter(filterClass) {
+      document.getElementById("gallery").className = "gallery " + filterClass;
+    }
+
+    // Theme Toggle
+    function toggleTheme() {
+      document.body.classList.toggle("light");
+    }
+
+    // Swipe Support for Mobile
+    let startX = 0;
+    lightbox.addEventListener("touchstart", (e) => {
+      startX = e.touches[0].clientX;
+    });
+    lightbox.addEventListener("touchend", (e) => {
+      let endX = e.changedTouches[0].clientX;
+      if (startX - endX > 50) nextImage();
+      if (endX - startX > 50) prevImage();
+    });
+  </script>
+</body>
+</html>
